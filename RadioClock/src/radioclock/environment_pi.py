@@ -3,11 +3,11 @@ Created on 28.02.2016
 
 @author: hardy
 '''
-import time
+from datetime import datetime
 import os
 import smbus
 import RPi.GPIO as GPIO
-from environment import Environment
+import logger
 
 BUTTON1_LED = 27
 BUTTON1_SWITCH = 24
@@ -17,6 +17,7 @@ OFF = False
 
 I2C_BUS = 1
 I2C_TSL2561_ADRESS = 0x29
+I2C_TCS34725_ADRESS = 0x29
 
 class EnvironmentPi(object):
 
@@ -33,7 +34,10 @@ class EnvironmentPi(object):
         GPIO.add_event_detect(BUTTON1_SWITCH, GPIO.BOTH, callback=self._handle_button1, bouncetime=500)
 
         self.i2cBus = smbus.SMBus(I2C_BUS)
-        self.i2cBus.write_byte_data(I2C_TSL2561_ADRESS, 0x80, 0x03)
+#        self.i2cBus.write_byte_data(I2C_TSL2561_ADRESS, 0x80, 0x03)
+        self.i2cBus.write_byte(I2C_TCS34725_ADRESS, 0x80|0x00) # 0x00 = ENABLE register
+        self.i2cBus.write_byte(I2C_TCS34725_ADRESS, 0x01|0x02) # 0x01 = Power on, 0x02 RGB sensors enabled
+        self.i2cBus.write_byte(I2C_TCS34725_ADRESS, 0x80|0x14) # Reading results start register 14, LSB then MSB
 
     def stop(self):
         GPIO.cleanup() 
@@ -53,9 +57,23 @@ class EnvironmentPi(object):
         GPIO.output(BUTTON1_LED, on_off)
 
     def _handle_button1(self, channel):
-        self.raise_event("Button1", None)
+        self.handler.raise_event("Button1", None)
 
     def get_ambient_light(self):
+        data = self.i2cBus.read_i2c_block_data(0x29, 0)
+        light = {}
+        light['c'] = data[1] << 8 | data[0]
+        light['r'] = data[3] << 8 | data[2]
+        light['g'] = data[5] << 8 | data[4]
+        light['b'] = data[7] << 8 | data[6]
+        lux = (-0.32466 * light['r']) + (1.57837 * light['g']) + (-0.73191 * light['b'])
+        light['l'] = int(lux) 
+        return light
+
+    def log_ambient_light(self, light):
+        logger.logvalue("Light", light)
+
+    def get_ambient_light_2(self):
         self.i2cBus.write_byte_data(I2C_TSL2561_ADRESS, 0x80, 0x03)
         ambiente_low_byte = self.i2cBus.read_byte_data(I2C_TSL2561_ADRESS, 0x8c)
         ambiente_high_byte = self.i2cBus.read_byte_data(I2C_TSL2561_ADRESS, 0x8d)
@@ -78,4 +96,9 @@ class EnvironmentPi(object):
         else:
             lux = 0
         return lux
+
+    def log_ambient_light_2(self):
+        lux = self.get_ambient_light()
+        logger.logvalue("Lux", lux)
+
         

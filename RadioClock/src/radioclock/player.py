@@ -4,18 +4,13 @@ Created on 22.12.2015
 @author: hardy
 '''
 
-import classes
 import kivy
-import sys
 
-from kivy.app import App
-from kivy.clock import Clock
 from kivy.core.audio import SoundLoader
-from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.button import Button
-from kivy.uix.label import Label
+import logger
 
 from swbus import SWBusComponent
+from jukebox import Source
 
 PLAYER = "Player"
 SOURCE = "Source"
@@ -31,18 +26,6 @@ PLAYING = "Playing"
 
 kivy.require('1.0.7')
 
-class Source:
-    
-    TYPE_SOURCE_SOUND = "Sound"
-    TYPE_SOURCE_RADIO = "Radio"
-    
-    def __init__(self, sourcetype, name, title, address):
-        self.sourcetype = sourcetype
-        self.name = name
-        self.title = title
-        self.address = address
-        
-        
 class Player(SWBusComponent):
     
     def __init__(self):
@@ -100,13 +83,14 @@ class Player(SWBusComponent):
             self.set_playing(True)
 
     def off(self):
+        logger.log("Player.off")
         if self._assert_stop():
             self.sound.unload()
             self.sound = None
 
     def _assert_stop(self):
         sound_stopped = False
-        if self.sound != None:
+        if self.sound is not None:
             if self.sound.state == 'play':
                 self.sound.stop()
                 self.set_playing(False)
@@ -142,15 +126,15 @@ class Player(SWBusComponent):
         self.play(event.data)
     
     def _stop(self, event):
-        self.stop
+        self.stop()
     
     def _start(self, event):
-        self.start
+        self.start()
     
     def _rewind(self, event):
-        self.rewind
+        self.rewind()
 
     def _off(self, event):
-        self.off
+        self.off()
     
 

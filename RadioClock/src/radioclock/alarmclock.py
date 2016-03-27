@@ -27,7 +27,7 @@ class AlarmType:
     def __init__(self):
         self.__class_name__ = "AlarmType"
         self.name = ""
-        self.source1 = None
+        self.sourceAlarm = None
         self.source_type1 = None
         self.source_name1 = None
         self.source2 = None
@@ -44,7 +44,7 @@ class Alarm:
     DAYS_NONE = "NONE"
     DAY_MONDAY = "MO"
     DAY_TUESDAY = "DI"
-    DAY_WEDNESYDAY = "MI"
+    DAY_WEDNESDAY = "MI"
     DAY_THURSDAY = "DO"
     DAY_FRIDAY = "FR"
     DAY_SATURDAY = "SA"
@@ -53,7 +53,7 @@ class Alarm:
     
     DAYS = (DAY_MONDAY,
             DAY_TUESDAY,
-            DAY_WEDNESYDAY,
+            DAY_WEDNESDAY,
             DAY_THURSDAY,
             DAY_FRIDAY,
             DAY_SATURDAY,
@@ -61,7 +61,7 @@ class Alarm:
 
     SET_DAYS_WEEK = set([DAY_MONDAY,
             DAY_TUESDAY,
-            DAY_WEDNESYDAY,
+            DAY_WEDNESDAY,
             DAY_THURSDAY,
             DAY_FRIDAY])
 
@@ -70,7 +70,7 @@ class Alarm:
 
     SET_DAYS_ALL = set([DAY_MONDAY,
             DAY_TUESDAY,
-            DAY_WEDNESYDAY,
+            DAY_WEDNESDAY,
             DAY_THURSDAY,
             DAY_FRIDAY,
             DAY_SATURDAY,
@@ -114,22 +114,29 @@ class AlarmClock(SWBusComponent):
         self.last_alarm = datetime.now()
         self.next_alarm = None
         
-        self.day = Alarm.DAYS_ALL
-        self.hour = 0
-        self.minute = 0
-        self.alarmtype = "STANDARD"
+#        self.day = Alarm.DAYS_ALL
+#        self.hour = 0
+#        self.minute = 0
+#        self.alarmtype = "STANDARD"
         
         self.alarmed_today = False
-        self.next_alarm = None
-        self.next_alarmtime = datetime(2016, 2, 8, 4, 58)
+
+ #       self.next_alarm = None
+ #       self.next_alarmtime = datetime(2016, 2, 8, 4, 58)
         
         self.alarmtypes = {}
         self.alarms = {}
-        self.set_alarm(Alarm.DAYS_WEEK, 4, 58, "STANDARD")
-        self.set_alarm(Alarm.DAYS_WEEKEND, 8, 30, "STANDARD")
-        self.set_next_alarm()
-        print self.next_alarm
-        print self.next_alarmtime
+#        self.set_alarm(Alarm.DAY_MONDAY, 8, 58, "Woche")
+#        self.set_alarm(Alarm.DAY_TUESDAY, 5, 58, "Woche")
+#        self.set_alarm(Alarm.DAY_WEDNESDAY, 8, 58, "Woche")
+#        self.set_alarm(Alarm.DAY_THURSDAY, 5, 58, "Woche")
+#        self.set_alarm(Alarm.DAY_FRIDAY, 7, 28, "Woche")
+#        self.set_alarm(Alarm.DAYS_WEEKEND, 8, 53, "Wochenende")
+        self.set_alarm(Alarm.DAYS_WEEK, 4, 58, "Woche")
+        self.set_alarm(Alarm.DAYS_WEEKEND, 8, 00, "Wochenende")
+#        self.set_next_alarm()
+#        print self.next_alarm
+#        print self.next_alarmtime
 
 #############################################################################################
 #
@@ -151,6 +158,10 @@ class AlarmClock(SWBusComponent):
         la = self.get_config_value(LAST_ALARM)
         if la is not None and la <> "":
             self.last_alarm = datetime.strptime(la, DATETIME_MINUTE_FORMAT)
+            if (self.last_alarm.date == datetime.now().date):
+                self.alarmed_today = True
+        
+        self.set_next_alarm()
         self.in_init = False
         
 #############################################################################################
@@ -159,7 +170,9 @@ class AlarmClock(SWBusComponent):
 #
 #############################################################################################
     def _handle_time(self, event):
-        self.check_alarm_time(event.data)
+        if self.check_alarm_time(event.data):
+            self.raise_event(ALARM, event.data)
+            self.set_next_alarm(force=True)
 
 #############################################################################################
 #
@@ -169,9 +182,9 @@ class AlarmClock(SWBusComponent):
     def set_alarm(self, day, hour, minute, alarmtype):
         alarm = Alarm(day, hour, minute, alarmtype)
         self.alarms[day] = alarm
-        self.set_next_alarm()
+#        self.set_next_alarm()
         
-    def set_next_alarm(self):
+    def set_next_alarm(self, force=False):
         now = datetime.now()
         tomorrow = now + timedelta(1)
         wd_today = Alarm.DAYS[now.weekday()]
@@ -180,13 +193,15 @@ class AlarmClock(SWBusComponent):
         alarm_tomorrow = self.get_alarm_for_day(wd_tomorrow)
         self.next_alarm = None
         self.next_alarmtime = None
-        if alarm_today is not None and not alarm_today.is_passed():
+        if alarm_today is not None and (not alarm_today.is_passed() and not force):
             self.next_alarm = alarm_today
             self.next_alarmtime = datetime(now.year, now.month, now.day, self.next_alarm.hour, self.next_alarm.minute)
+            self.raise_valuechange(ALARM_TIME, Alarm.DAYS[self.next_alarmtime.weekday()] + '. ' + datetime.strftime(self.next_alarmtime, TIME_MINUTE_FORMAT))
         elif alarm_tomorrow is not None:
             self.next_alarm = alarm_tomorrow
             self.next_alarmtime = datetime(tomorrow.year, tomorrow.month, tomorrow.day, self.next_alarm.hour, self.next_alarm.minute)
-
+            self.raise_valuechange(ALARM_TIME, Alarm.DAYS[self.next_alarmtime.weekday()] + '. ' + datetime.strftime(self.next_alarmtime, TIME_MINUTE_FORMAT))
+        
     def get_alarm_for_day(self, weekday):
         erg = None
         last_level = 4
@@ -201,15 +216,15 @@ class AlarmClock(SWBusComponent):
                     last_level = alarm.level
         return erg
                     
-    def checkAlarmTime(self):
-        self.checkNewDay()
-        if not self.alarmed_today and self.alarmTime <= datetime.now():
+    def check_alarm_time(self, actualtime):
+        self.check_new_day(actualtime)
+        if not self.alarmed_today and self.next_alarmtime <= actualtime:
             self.alarmed_today = True
             return True
         return False
             
-    def checkNewDay(self):
-        s = datetime.now().isoformat()[11:16]
+    def check_new_day(self, actualtime):
+        s = actualtime.isoformat()[11:16]
         if s == "00:00":
             self.alarmed_today = False
 

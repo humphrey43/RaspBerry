@@ -4,6 +4,7 @@ Created on 18.02.2016
 @author: hardy
 '''
 from kivy.clock import Clock
+from kivy.graphics import Color
 from Queue import Queue
 
 READ = "R"
@@ -34,7 +35,7 @@ class SWBusMaster:
         
 #############################################################################################
     def _work_events(self, data):
-        print "work_events " + str(data)
+#        print "work_events " + str(data)
         while not self.event_queue.empty():
             event = self.event_queue.get(False)
             if event is not None:
@@ -279,6 +280,8 @@ class SWBusComponent(object):
     def raise_event(self, eventname, data):
         global master
         event = Event(self.name + "." + eventname, data)
+        if eventname <> "Second":
+            print "Event: " + event.eventname 
         master.raise_event(event)
 
     def raise_valuechange(self, valuename, value):
@@ -303,6 +306,18 @@ class SWBusComponent(object):
 
     def get_config_value(self, valuename):
         return self.config.get(self.name, valuename.lower())
+
+    def get_config_color(self, valuename):
+        r = self.get_config_int(valuename + "_r") / 256.0
+        g = self.get_config_int(valuename + "_g") / 256.0
+        b = self.get_config_int(valuename + "_b") / 256.0
+        return Color(r, g, b, 1)
+
+    def get_config_color_list(self, valuename):
+        r = self.get_config_int(valuename + "_r") / 256.0
+        g = self.get_config_int(valuename + "_g") / 256.0
+        b = self.get_config_int(valuename + "_b") / 256.0
+        return [r, g, b, 1]
 
     def define_value(self, valuename, register = True, setter=None, getter=None, valuechange=False):
         info = LocalValueInfo(self, valuename, register, setter, getter)

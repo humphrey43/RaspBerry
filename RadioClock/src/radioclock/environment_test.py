@@ -39,3 +39,5 @@ class EnvironmentTest(object):
     def push_button1(self):
         self.handler.handle_button1()
 
+    def log_ambient_light(self):
+        pass
